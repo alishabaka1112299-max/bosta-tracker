@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bosta — لوحة تتبع الشحنات</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0b0e14;
+    --surface:   #111520;
+    --card:      #161b27;
+    --border:    #1e2640;
+    --accent:    #e8383f;
+    --accent2:   #f97316;
+    --green:     #22c55e;
+    --yellow:    #eab308;
+    --blue:      #3b82f6;
+    --muted:     #4a5270;
+    --text:      #e2e8f8;
+    --text-dim:  #8892aa;
+    --font:      'IBM Plex Sans Arabic', sans-serif;
+    --mono:      'JetBrains Mono', monospace;
+    --radius:    10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── grid bg texture ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(11,14,20,.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 64px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 18px; font-weight: 700; letter-spacing: -.5px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .live-pill {
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(34,197,94,.1);
+    border: 1px solid rgba(34,197,94,.25);
+    color: var(--green);
+    font-size: 12px; font-weight: 600;
+    padding: 5px 12px; border-radius: 20px;
+    letter-spacing: .3px;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 1.8s ease infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.4; transform:scale(.7); }
+  }
+
+  /* ── MAIN ── */
+  main {
+    position: relative; z-index: 1;
+    max-width: 1100px; margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* ── STATS BAR ── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 60px; height: 60px;
+    border-radius: 0 var(--radius) 0 60px;
+    opacity: .08;
+  }
+  .stat-card.s-total::before  { background: var(--blue); }
+  .stat-card.s-delivered::before { background: var(--green); }
+  .stat-card.s-exception::before { background: var(--yellow); }
+  .stat-card.s-returned::before { background: var(--accent); }
+  .stat-label {
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-dim); margin-bottom: 8px;
+  }
+  .stat-num {
+    font-size: 30px; font-weight: 700;
+    font-family: var(--mono);
+    line-height: 1;
+  }
+  .s-total    .stat-num { color: var(--blue); }
+  .s-delivered .stat-num { color: var(--green); }
+  .s-exception .stat-num { color: var(--yellow); }
+  .s-returned .stat-num { color: var(--accent); }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex; gap: 12px; align-items: center;
+    margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .search-wrap {
+    flex: 1; min-width: 220px;
+    position: relative;
+  }
+  .search-wrap input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    padding: 10px 42px 10px 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--blue); }
+  .search-wrap input::placeholder { color: var(--muted); }
+  .search-icon {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); pointer-events: none; font-size: 15px;
+  }
+  .filter-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--font);
+    font-size: 13px; font-weight: 500;
+    padding: 9px 16px; border-radius: var(--radius);
+    cursor: pointer; transition: all .2s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    border-color: var(--blue);
+    color: var(--blue);
+    background: rgba(59,130,246,.08);
+  }
+  .clear-btn {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    font-family: var(--font);
+    font-size: 13px; font-weight: 600;
+    padding: 9px 18px; border-radius: var(--radius);
+    cursor: pointer; transition: opacity .2s;
+  }
+  .clear-btn:hover { opacity: .85; }
+
+  /* ── ORDERS TABLE ── */
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--surface);
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-dim);
+    padding: 13px 18px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+    cursor: pointer;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,.025); }
+  tbody tr.expanded { background: rgba(59,130,246,.04); }
+  td {
+    padding: 14px 18px;
+    font-size: 14px;
+    vertical-align: middle;
+  }
+  .td-tracking {
+    font-family: var(--mono);
+    font-size: 13px; font-weight: 600;
+    color: var(--blue);
+    letter-spacing: .5px;
+  }
+  .td-ref {
+    font-size: 12px; color: var(--text-dim);
+  }
+  .td-time {
+    font-size: 12px; color: var(--text-dim);
+    font-family: var(--mono);
+  }
+  .td-attempts {
+    font-family: var(--mono); font-size: 13px;
+    text-align: center;
+  }
+  .chevron {
+    transition: transform .25s;
+    color: var(--muted); font-size: 12px;
+    display: inline-block;
+  }
+  tr.expanded .chevron { transform: rotate(90deg); }
+
+  /* ── BADGE ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 6px;
+    font-size: 12px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  .badge-new        { background:rgba(59,130,246,.12); color:#60a5fa; }
+  .badge-new .badge-dot { background:#60a5fa; }
+  .badge-inprogress { background:rgba(234,179,8,.12);  color:#fbbf24; }
+  .badge-inprogress .badge-dot { background:#fbbf24; }
+  .badge-delivered  { background:rgba(34,197,94,.12);  color:#4ade80; }
+  .badge-delivered .badge-dot  { background:#4ade80; }
+  .badge-exception  { background:rgba(249,115,22,.12); color:#fb923c; }
+  .badge-exception .badge-dot  { background:#fb923c; }
+  .badge-returned   { background:rgba(232,56,63,.12);  color:#f87171; }
+  .badge-returned .badge-dot   { background:#f87171; }
+  .badge-terminated { background:rgba(148,163,184,.12);color:#94a3b8; }
+  .badge-terminated .badge-dot { background:#94a3b8; }
+  .badge-lost       { background:rgba(239,68,68,.2);   color:#ef4444; }
+  .badge-lost .badge-dot       { background:#ef4444; }
+
+  /* ── DETAIL ROW ── */
+  .detail-row td {
+    padding: 0;
+    background: var(--surface);
+  }
+  .detail-inner {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height .35s ease;
+  }
+  .detail-inner.open { max-height: 500px; }
+  .detail-content {
+    padding: 20px 24px 24px;
+    border-top: 1px solid var(--border);
+  }
+  .detail-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-dim); margin-bottom: 16px;
+  }
+
+  /* ── TIMELINE ── */
+  .timeline {
+    display: flex; flex-direction: column; gap: 0;
+    position: relative;
+  }
+  .tl-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding-bottom: 18px;
+    position: relative;
+  }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-item:last-child .tl-line { display: none; }
+  .tl-icon-wrap {
+    position: relative; flex-shrink: 0;
+    width: 32px; display: flex; flex-direction: column; align-items: center;
+  }
+  .tl-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+    border: 2px solid transparent;
+  }
+  .tl-line {
+    width: 2px; flex: 1; min-height: 18px;
+    background: var(--border);
+    margin-top: 4px;
+  }
+  .tl-body { flex: 1; padding-top: 4px; }
+  .tl-state { font-size: 14px; font-weight: 600; }
+  .tl-meta  { font-size: 12px; color: var(--text-dim); margin-top: 3px; font-family: var(--mono); }
+  .tl-exc   {
+    margin-top: 6px; font-size: 12px;
+    background: rgba(249,115,22,.1);
+    border: 1px solid rgba(249,115,22,.2);
+    color: #fb923c;
+    padding: 6px 10px; border-radius: 6px;
+    display: inline-block;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty {
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--text-dim);
+  }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .4; }
+  .empty h3 { font-size: 18px; color: var(--text); margin-bottom: 8px; }
+  .empty p  { font-size: 14px; line-height: 1.6; }
+
+  /* ── TOAST ── */
+  .toast-area {
+    position: fixed; bottom: 24px; left: 24px; z-index: 999;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .toast {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-right: 3px solid var(--green);
+    border-radius: var(--radius);
+    padding: 12px 18px;
+    font-size: 13px; font-weight: 500;
+    color: var(--text);
+    box-shadow: 0 8px 30px rgba(0,0,0,.4);
+    animation: toastIn .3s ease, toastOut .3s ease 3.7s forwards;
+    max-width: 340px;
+  }
+  .toast .t-tracking { font-family: var(--mono); color: var(--blue); font-weight: 700; }
+  @keyframes toastIn  { from { transform: translateX(-20px); opacity:0; } }
+  @keyframes toastOut { to   { transform: translateX(-20px); opacity:0; } }
+
+  /* ── COD BADGE ── */
+  .cod-val {
+    font-family: var(--mono); font-size: 13px;
+    color: var(--green); font-weight: 700;
+  }
+  .cod-na { color: var(--muted); font-size: 12px; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media(max-width:700px){
+    .stats { grid-template-columns: 1fr 1fr; }
+    header { padding: 0 16px; }
+    main   { padding: 20px 14px; }
+    td, th { padding: 10px 12px; }
+    .td-ref, .td-time { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📦</div>
+    Bosta Tracker
+  </div>
+  <div class="live-pill">
+    <span class="live-dot"></span>
+    مباشر
+  </div>
+</header>
+
+<main>
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card s-total">
+      <div class="stat-label">إجمالي الشحنات</div>
+      <div class="stat-num" id="cnt-total">0</div>
+    </div>
+    <div class="stat-card s-delivered">
+      <div class="stat-label">تم التسليم</div>
+      <div class="stat-num" id="cnt-delivered">0</div>
+    </div>
+    <div class="stat-card s-exception">
+      <div class="stat-label">استثناء</div>
+      <div class="stat-num" id="cnt-exception">0</div>
+    </div>
+    <div class="stat-card s-returned">
+      <div class="stat-label">مرتجع</div>
+      <div class="stat-num" id="cnt-returned">0</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search" placeholder="ابحث برقم التتبع أو رقم الأوردر…" oninput="render()">
+    </div>
+    <button class="filter-btn active" onclick="setFilter('all',this)">الكل</button>
+    <button class="filter-btn" onclick="setFilter('delivered',this)">تم التسليم</button>
+    <button class="filter-btn" onclick="setFilter('exception',this)">استثناء</button>
+    <button class="filter-btn" onclick="setFilter('returned',this)">مرتجع</button>
+    <button class="clear-btn" onclick="clearAll()">مسح الكل</button>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>رقم التتبع</th>
+          <th>المرجع</th>
+          <th>الحالة</th>
+          <th>COD</th>
+          <th>المحاولات</th>
+          <th>آخر تحديث</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Toast area -->
+<div class="toast-area" id="toasts"></div>
+
+<script>
+// ─── State map: trackingNumber → { latest payload, history[] } ───
+const orders = new Map();
+let activeFilter = 'all';
+
+// ─── State definitions ───
+const STATE_MAP = {
+  10: { label: 'طلب استلام',         cls: 'badge-new',        icon: '📋', tl: '🏁' },
+  11: { label: 'انتظار مسار',         cls: 'badge-inprogress', icon: '⏳', tl: '⏳' },
+  20: { label: 'تم تعيين المسار',     cls: 'badge-inprogress', icon: '🗺️', tl: '🗺️' },
+  21: { label: 'تم الاستلام من البيزنس', cls: 'badge-inprogress', icon: '📦', tl: '📦' },
+  22: { label: 'في الطريق للعميل (استرداد)', cls: 'badge-inprogress', icon: '🚗', tl: '🚗' },
+  23: { label: 'تم الاستلام من العميل', cls: 'badge-inprogress', icon: '✋', tl: '✋' },
+  24: { label: 'وصل للمستودع',        cls: 'badge-inprogress', icon: '🏭', tl: '🏭' },
+  25: { label: 'تم التجهيز',          cls: 'badge-delivered',  icon: '✅', tl: '✅' },
+  30: { label: 'في النقل بين الفروع', cls: 'badge-inprogress', icon: '🚚', tl: '🚚' },
+  40: { label: 'في الطريق (تحصيل)',   cls: 'badge-inprogress', icon: '💰', tl: '💰' },
+  41: { label: 'خرج للتوصيل',         cls: 'badge-inprogress', icon: '🛵', tl: '🛵' },
+  45: { label: 'تم التسليم ✓',         cls: 'badge-delivered',  icon: '✅', tl: '🎉' },
+  46: { label: 'أُعيد للبيزنس',        cls: 'badge-returned',   icon: '↩️', tl: '↩️' },
+  47: { label: 'استثناء',             cls: 'badge-exception',  icon: '⚠️', tl: '⚠️' },
+  48: { label: 'منتهي',               cls: 'badge-terminated', icon: '🚫', tl: '🚫' },
+  49: { label: 'ملغي',                cls: 'badge-terminated', icon: '❌', tl: '❌' },
+  60: { label: 'أُعيد للمخزن',        cls: 'badge-returned',   icon: '📦', tl: '📦' },
+ 100: { label: 'مفقود',              cls: 'badge-lost',       icon: '❓', tl: '❓' },
+ 101: { label: 'تالف',               cls: 'badge-lost',       icon: '💔', tl: '💔' },
+ 102: { label: 'قيد التحقيق',         cls: 'badge-exception',  icon: '🔍', tl: '🔍' },
+ 103: { label: 'في انتظار إجراءك',   cls: 'badge-exception',  icon: '👋', tl: '👋' },
+ 104: { label: 'مؤرشف',              cls: 'badge-terminated', icon: '🗂️', tl: '🗂️' },
+ 105: { label: 'معلّق',              cls: 'badge-inprogress', icon: '⏸️', tl: '⏸️' },
+};
+
+function getState(code){
+  return STATE_MAP[code] || { label: `State ${code}`, cls: 'badge-terminated', icon: '❔', tl: '❔' };
+}
+
+function formatTime(ts){
+  if(!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('ar-EG',{day:'2-digit',month:'short'}) + ' ' +
+         d.toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ─── Receive a webhook payload (called by your backend or test button) ───
+window.receiveWebhook = function(payload){
+  const key = String(payload.trackingNumber);
+  if(!orders.has(key)){
+    orders.set(key, { latest: payload, history: [payload] });
+  } else {
+    const entry = orders.get(key);
+    entry.latest = payload;
+    entry.history.push(payload);
+  }
+  updateStats();
+  render();
+  showToast(payload);
+};
+
+// ─── Stats ───
+function updateStats(){
+  const all = [...orders.values()];
+  document.getElementById('cnt-total').textContent = all.length;
+  document.getElementById('cnt-delivered').textContent  = all.filter(o=>o.latest.state===45).length;
+  document.getElementById('cnt-exception').textContent  = all.filter(o=>o.latest.state===47).length;
+  document.getElementById('cnt-returned').textContent   = all.filter(o=>[46,60].includes(o.latest.state)).length;
+}
+
+// ─── Filter ───
+function setFilter(f, btn){
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+// ─── Render ───
+function render(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const tbody = document.getElementById('tbody');
+
+  let rows = [...orders.entries()]; // [key, entry]
+
+  // search
+  if(q) rows = rows.filter(([k,e])=>
+    k.toLowerCase().includes(q) ||
+    (e.latest.businessReference||'').toLowerCase().includes(q)
+  );
+
+  // filter
+  if(activeFilter === 'delivered') rows = rows.filter(([,e])=>e.latest.state===45);
+  if(activeFilter === 'exception') rows = rows.filter(([,e])=>e.latest.state===47);
+  if(activeFilter === 'returned')  rows = rows.filter(([,e])=>[46,60].includes(e.latest.state));
+
+  if(rows.length === 0){
+    tbody.innerHTML = `
+      <tr><td colspan="7">
+        <div class="empty">
+          <div class="empty-icon">📭</div>
+          <h3>${orders.size===0 ? 'في انتظار أول Webhook من Bosta' : 'لا توجد نتائج'}</h3>
+          <p>${orders.size===0
+            ? 'بمجرد وصول أول تحديث شحنة، هيظهر هنا تلقائيًا.'
+            : 'جرب تغيير فلتر التصفية أو البحث.'}</p>
+        </div>
+      </td></tr>`;
+    return;
+  }
+
+  // sort newest first
+  rows.sort((a,b)=> (b[1].latest.timeStamp||0) - (a[1].latest.timeStamp||0));
+
+  tbody.innerHTML = rows.map(([key,entry])=>{
+    const p = entry.latest;
+    const st = getState(p.state);
+    const cod = p.cod != null ? `<span class="cod-val">${p.cod.toLocaleString('ar-EG')} ج.م</span>` : `<span class="cod-na">—</span>`;
+    const attempts = p.numberOfAttempts != null ? p.numberOfAttempts : '—';
+    const ref = p.businessReference ? `<div class="td-ref">${p.businessReference}</div>` : '';
+
+    return `
+    <tr onclick="toggleDetail('${key}')" id="row-${key}">
+      <td><span class="chevron" id="chev-${key}">▶</span></td>
+      <td><div class="td-tracking">${p.trackingNumber}</div>${ref}</td>
+      <td class="td-ref">${p.businessReference || '—'}</td>
+      <td><span class="badge ${st.cls}"><span class="badge-dot"></span>${st.label}</span></td>
+      <td>${cod}</td>
+      <td class="td-attempts">${attempts}</td>
+      <td class="td-time">${formatTime(p.timeStamp)}</td>
+    </tr>
+    <tr class="detail-row" id="detail-${key}">
+      <td colspan="7">
+        <div class="detail-inner" id="inner-${key}">
+          <div class="detail-content">
+            <div class="detail-title">سجل التحديثات</div>
+            <div class="timeline">
+              ${entry.history.slice().reverse().map((h,i)=>{
+                const hs = getState(h.state);
+                const isFirst = i===0;
+                const dotColor = isFirst ? '#60a5fa' : 'var(--muted)';
+                const exc = h.exceptionReason
+                  ? `<div class="tl-exc">⚠️ ${h.exceptionReason}</div>` : '';
+                return `
+                <div class="tl-item">
+                  <div class="tl-icon-wrap">
+                    <div class="tl-icon" style="background:${isFirst?'rgba(59,130,246,.15)':'rgba(255,255,255,.04)'};border-color:${dotColor}">${hs.tl}</div>
+                    <div class="tl-line"></div>
+                  </div>
+                  <div class="tl-body">
+                    <div class="tl-state" style="color:${isFirst?'var(--text)':'var(--text-dim)'}">${hs.label}</div>
+                    <div class="tl-meta">${formatTime(h.timeStamp)}${h.deliveryPromiseDate ? ' · موعد التسليم: '+h.deliveryPromiseDate : ''}</div>
+                    ${exc}
+                  </div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleDetail(key){
+  const inner = document.getElementById('inner-'+key);
+  const row   = document.getElementById('row-'+key);
+  const chev  = document.getElementById('chev-'+key);
+  const open  = inner.classList.toggle('open');
+  row.classList.toggle('expanded', open);
+}
+
+// ─── Toast ───
+function showToast(p){
+  const st = getState(p.state);
+  const area = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `${st.icon} تحديث: <span class="t-tracking">${p.trackingNumber}</span> — ${st.label}`;
+  area.appendChild(t);
+  setTimeout(()=>t.remove(), 4200);
+}
+
+// ─── SSE: connect to backend ───
+function connectSSE(){
+  // Change this URL to your backend SSE endpoint
+  const SSE_URL = '/events';
+  try {
+    const es = new EventSource(SSE_URL);
+    es.onmessage = e => {
+      try { receiveWebhook(JSON.parse(e.data)); } catch(err){}
+    };
+    es.onerror = () => {
+      // Silent retry
+      setTimeout(connectSSE, 5000);
+      es.close();
+    };
+  } catch(e){}
+}
+
+// ─── Demo data (remove in production) ───
+function loadDemo(){
+  const samples = [
+    { _id:'a1', trackingNumber:48089601, state:45, type:'SEND', cod:850, timeStamp:Date.now()-3600000, deliveryPromiseDate:'01-06-2024', numberOfAttempts:1, businessReference:'ORD-1001' },
+    { _id:'a2', trackingNumber:48089602, state:47, type:'SEND', timeStamp:Date.now()-1800000, deliveryPromiseDate:'01-06-2024', numberOfAttempts:2, exceptionReason:'العميل طلب التأجيل ليوم آخر.', exceptionCode:3, businessReference:'ORD-1002' },
+    { _id:'a3', trackingNumber:48089603, state:41, type:'SEND', timeStamp:Date.now()-900000,  deliveryPromiseDate:'01-06-2024', numberOfAttempts:0, businessReference:'ORD-1003' },
+    { _id:'a4', trackingNumber:48089604, state:24, type:'SEND', timeStamp:Date.now()-7200000, deliveryPromiseDate:'02-06-2024', numberOfAttempts:0, businessReference:'ORD-1004' },
+    { _id:'a5', trackingNumber:48089605, state:46, type:'EXCHANGE', timeStamp:Date.now()-500000, numberOfAttempts:1, businessReference:'ORD-1005' },
+  ];
+
+  // simulate history
+  receiveWebhook({ ...samples[0], state:10, timeStamp: samples[0].timeStamp - 86400000 });
+  receiveWebhook({ ...samples[0], state:24, timeStamp: samples[0].timeStamp - 43200000 });
+  receiveWebhook(samples[0]);
+
+  receiveWebhook({ ...samples[1], state:10, timeStamp: samples[1].timeStamp - 86400000 });
+  receiveWebhook({ ...samples[1], state:41, timeStamp: samples[1].timeStamp - 3600000 });
+  receiveWebhook(samples[1]);
+
+  [samples[2], samples[3], samples[4]].forEach(s => receiveWebhook(s));
+}
+
+// Uncomment to test with demo data:
+loadDemo();
+
+// Connect SSE when ready:
+// connectSSE();
+</script>
+</body>
+</html>
