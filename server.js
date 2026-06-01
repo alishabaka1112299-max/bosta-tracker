@@ -45,13 +45,10 @@ app.post('/webhook', (req, res) => {
   res.status(200).json({ received: true });
 });
 
-function fetchOpenOrders() {
-  if (!BOSTA_API_KEY) return;
-  console.log('[Bosta] Fetching open orders...');
-
+function bostaRequest(path, callback) {
   const options = {
     hostname: 'app.bosta.co',
-    path: '/api/v2/deliveries?limit=100&page=0',
+    path: path,
     method: 'GET',
     headers: {
       'Authorization': BOSTA_API_KEY,
@@ -63,42 +60,51 @@ function fetchOpenOrders() {
   const req = https.request(options, (res) => {
     let data = '';
     res.on('data', chunk => data += chunk);
-    res.on('end', () => {
-      console.log('[Bosta] Status:', res.statusCode);
-      console.log('[Bosta] Response (first 300):', data.substring(0, 300));
-      try {
-        const json = JSON.parse(data);
-        const deliveries =
-          json?.result?.list ||
-          json?.data?.list ||
-          json?.list ||
-          json?.deliveries ||
-          (Array.isArray(json) ? json : []);
-
-        console.log(`[Bosta] Got ${deliveries.length} orders`);
-
-        deliveries.forEach(order => {
-          const payload = {
-            _id:                order._id,
-            trackingNumber:     order.trackingNumber,
-            state:              order.state?.code ?? order.state,
-            type:               order.type,
-            cod:                order.cod?.amount ?? order.cod,
-            timeStamp:          order.updatedAt ? new Date(order.updatedAt).getTime() : Date.now(),
-            deliveryPromiseDate: order.scheduledDate || null,
-            numberOfAttempts:   order.noOfAttempts || 0,
-            businessReference:  order.businessReference || null,
-          };
-          broadcast(payload);
-        });
-      } catch (e) {
-        console.error('[Bosta] Parse error:', e.message);
-      }
-    });
+    res.on('end', () => callback(res.statusCode, data));
   });
-
-  req.on('error', e => console.error('[Bosta] Request error:', e.message));
+  req.on('error', e => console.error('[Bosta] Error:', e.message));
   req.end();
+}
+
+function fetchOpenOrders() {
+  if (!BOSTA_API_KEY) return;
+  console.log('[Bosta] Fetching open orders...');
+
+  // Try the correct endpoint with apiVersion
+  bostaRequest('/api/v2/deliveries?apiVersion=1&limit=100&page=0', (status, data) => {
+    console.log('[Bosta] Status:', status);
+    console.log('[Bosta] Response (first 400):', data.substring(0, 400));
+
+    try {
+      const json = JSON.parse(data);
+      const deliveries =
+        json?.result?.list ||
+        json?.data?.list ||
+        json?.list ||
+        json?.deliveries ||
+        (Array.isArray(json) ? json : []);
+
+      console.log(`[Bosta] Got ${deliveries.length} orders`);
+
+      deliveries.forEach(order => {
+        const payload = {
+          _id:                order._id,
+          trackingNumber:     order.trackingNumber,
+          state:              order.state?.code ?? order.state,
+          type:               order.type,
+          cod:                order.cod?.amount ?? order.cod,
+          timeStamp:          order.updatedAt ? new Date(order.updatedAt).getTime() : Date.now(),
+          deliveryPromiseDate: order.scheduledDate || null,
+          numberOfAttempts:   order.noOfAttempts || 0,
+          businessReference:  order.businessReference || null,
+        };
+        broadcast(payload);
+      });
+    } catch (e) {
+      console.error('[Bosta] Parse error:', e.message);
+      console.error('[Bosta] Raw response:', data.substring(0, 200));
+    }
+  });
 }
 
 setTimeout(fetchOpenOrders, 3000);
