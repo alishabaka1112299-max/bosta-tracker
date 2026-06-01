@@ -54,7 +54,7 @@ function fetchOpenOrders() {
     path: '/api/v2/deliveries?limit=100&page=0',
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${BOSTA_API_KEY}`,
+      'Authorization': BOSTA_API_KEY,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     }
